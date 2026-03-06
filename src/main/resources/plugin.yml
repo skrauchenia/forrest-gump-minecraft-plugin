@@ -1,0 +1,12 @@
+name: StalkerNPC
+version: 0.1.0
+main: com.kupal.stalker.StalkerPlugin
+api-version: "1.21"
+author: kupal
+commands:
+  stalker:
+    description: Control stalker NPC
+    usage: /stalker <spawn|despawn|start|stop|status>
+permissions:
+  stalker.admin:
+    default: op

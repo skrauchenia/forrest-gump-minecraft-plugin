@@ -1,0 +1,18 @@
+tickPeriod: 5
+
+# Radius within which the player can be targeted for pranks
+targetSearchRadius: 48.0
+minDistance: 6.0
+maxDistance: 18.0
+
+# Player vision
+freezeDotThreshold: 0.65   # чем больше, тем строже "смотрит"
+requireLineOfSight: true
+
+# Movement
+approachSpeed: 1.15
+observeSpeed: 0.80
+
+# Prank settings
+enablePranks: false
+prankChancePerTick: 0.02
