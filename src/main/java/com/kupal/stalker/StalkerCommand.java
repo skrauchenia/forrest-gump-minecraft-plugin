@@ -24,10 +24,6 @@ public final class StalkerCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("Only players can use this.");
             return true;
         }
-//        if (!p.hasPermission("stalker.admin")) {
-//            p.sendMessage(ChatColor.RED + "No permission.");
-//            return true;
-//        }
 
         if (args.length == 0) {
             p.sendMessage(ChatColor.YELLOW + "Usage: /stalker <spawn|despawn|start|stop|status>");
@@ -52,9 +48,7 @@ public final class StalkerCommand implements CommandExecutor, TabCompleter {
                 manager.stop();
                 p.sendMessage(ChatColor.GREEN + "Stalker stopped.");
             }
-            case "status" -> {
-                p.sendMessage(ChatColor.AQUA + manager.status());
-            }
+            case "status" -> p.sendMessage(ChatColor.AQUA + manager.status());
             default -> p.sendMessage(ChatColor.YELLOW + "Unknown. Use: spawn|despawn|start|stop|status");
         }
         return true;

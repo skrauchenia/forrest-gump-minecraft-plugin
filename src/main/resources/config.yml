@@ -1,9 +1,14 @@
-tickPeriod: 5
+# ticks
+tickPeriod: 50
+hideRecomputeCooldownTicks: 20
+approachTargetCooldownTicks: 20
+retreatRecomputeCooldownTicks: 10
+loiterRecomputeCooldownTicks: 50
 
 # Radius within which the player can be targeted for pranks
-targetSearchRadius: 48.0
-minDistance: 6.0
-maxDistance: 18.0
+targetSearchRadius: 148.0
+minDistance: 50
+maxDistance: 150
 
 # Player vision
 freezeDotThreshold: 0.65   # чем больше, тем строже "смотрит"
