@@ -39,7 +39,7 @@ public final class WanderActionNode extends StatefulActionNode {
             return Status.SUCCESS;
         }
 
-        ctx.navigation().moveTo(mob, target, speed);
+        ctx.navigation().moveTo(mob, target, speed, bb);
         return Status.RUNNING;
     }
 

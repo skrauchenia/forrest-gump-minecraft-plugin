@@ -4,9 +4,12 @@ import com.kupal.stalker.ai.*;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 
+import java.util.logging.Logger;
+
 public final class FindTargetPlayerNode implements BtNode {
 
     private final double targetSearchRadius;
+    private final Logger log = Logger.getLogger(FindTargetPlayerNode.class.getSimpleName());
 
     public FindTargetPlayerNode(double targetSearchRadius) {
         this.targetSearchRadius = targetSearchRadius;
@@ -29,10 +32,12 @@ public final class FindTargetPlayerNode implements BtNode {
 
         if (best == null) {
             bb.remove(StalkerBbKeys.TARGET_PLAYER);
+            log.info("Found no target player within radius %.1f".formatted(targetSearchRadius));
             return Status.FAILURE;
+        } else {
+            bb.put(StalkerBbKeys.TARGET_PLAYER, best);
+            log.info("Found target player %s at distance %.1f".formatted(best.getName(), bestDist));
+            return Status.SUCCESS;
         }
-
-        bb.put(StalkerBbKeys.TARGET_PLAYER, best);
-        return Status.SUCCESS;
     }
 }

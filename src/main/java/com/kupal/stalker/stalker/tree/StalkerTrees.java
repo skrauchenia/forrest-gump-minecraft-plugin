@@ -2,10 +2,12 @@ package com.kupal.stalker.stalker.tree;
 
 import com.kupal.stalker.StalkerPlugin;
 import com.kupal.stalker.ai.BtNode;
+import com.kupal.stalker.ai.minecraft.TargetDistanceCheckNode;
 import com.kupal.stalker.ai.nodes.*;
 import com.kupal.stalker.services.MovementService;
 import com.kupal.stalker.services.PrankService;
 import com.kupal.stalker.services.VisionService;
+import com.kupal.stalker.util.IntComparison;
 
 import java.util.List;
 
@@ -21,8 +23,22 @@ public final class StalkerTrees {
             PrankService pranks
     ) {
         double targetSearchRadius = plugin.getConfig().getDouble("targetSearchRadius", 48.0);
-        double minDistance = plugin.getConfig().getDouble("minDistance", 6.0);
+        int minDistance = (int) plugin.getConfig().getDouble("minDistance", 6.0);
         double maxDistance = plugin.getConfig().getDouble("maxDistance", 18.0);
+
+        long panicDurationTicks = plugin.getConfig().getLong("panicDurationTicks", 40L);
+
+        BtNode panicBranch = new DebugLabelNode(
+                "PANIC",
+                StalkerBbKeys.DEBUG_STATE,
+                new SequenceNode(List.of(
+                        new RecentlyDamagedAndCloseNode(panicDurationTicks),
+//                        new CooldownDecoratorNode(
+//                                new ComputePanicRetreatTargetNode(movement, 50),
+//                                5L
+//                        ),
+                        new MoveToTargetNode(StalkerBbKeys.PANIC_TARGET, 1.5, 0.28)
+                )));
 
         BtNode hideBranch = new DebugLabelNode(
                 "HIDING",
@@ -57,16 +73,20 @@ public final class StalkerTrees {
                         new MoveToTargetNode(StalkerBbKeys.APPROACH_TARGET, 1.5, 0.22)
                 )));
 
-        BtNode retreatBranch = new SequenceNode(List.of(
-                new FindTargetPlayerNode(targetSearchRadius),
-                new NotNode(new TargetSeesNpcNode(vision)),
-                new TargetDistanceLessThanNode(minDistance),
-                new CooldownDecoratorNode(
-                        new ComputeRetreatTargetNode(movement, 6.0),
-                        plugin.getConfig().getInt("retreatRecomputeCooldownTicks", 20)
-                ),
-                new MoveToTargetNode(StalkerBbKeys.RETREAT_TARGET, 1.5, 0.23)
-        ));
+        BtNode retreatBranch = new DebugLabelNode(
+                "RETREATING",
+                StalkerBbKeys.DEBUG_STATE,
+                new SequenceNode(List.of(
+                        new FindTargetPlayerNode(targetSearchRadius),
+//                new NotNode(new TargetSeesNpcNode(vision)),
+                        new TargetDistanceCheckNode(StalkerBbKeys.TARGET_PLAYER, IntComparison.LT, minDistance),
+//                        new CooldownDecoratorNode(
+//                                new ComputeRetreatTargetNode(movement, minDistance + 10),
+//                                plugin.getConfig().getInt("retreatRecomputeCooldownTicks", 20)
+//                        ),
+                        new ComputeRetreatTargetNode(movement, minDistance + 10),
+                        new MoveToTargetNode(StalkerBbKeys.RETREAT_TARGET, 1.5, 1.0)
+                )));
 
         BtNode observeBranch = new DebugLabelNode(
                 "OBSERVING",
@@ -82,11 +102,12 @@ public final class StalkerTrees {
                 )));
 
         return new SelectorNode(List.of(
-                hideBranch,
+//                panicBranch
+//                hideBranch
 //                prankBranch,
-                stalkBranch,
-                retreatBranch,
-                observeBranch
+//                stalkBranch,
+                retreatBranch
+//                observeBranch
         ));
     }
 }

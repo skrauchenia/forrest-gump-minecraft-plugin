@@ -21,6 +21,8 @@ public final class StalkerPlugin extends JavaPlugin {
             cmd.setTabCompleter(command);
         }
 
+        getServer().getPluginManager().registerEvents(new StalkerListener(stalkerManager), this);
+
         getLogger().info("StalkerNPC enabled");
     }
 

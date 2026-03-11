@@ -1,25 +1,30 @@
 package com.kupal.stalker.services;
 
 import com.destroystokyo.paper.entity.Pathfinder;
+import com.kupal.stalker.StalkerPlugin;
+import com.kupal.stalker.ai.services.VisualDebugService;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
 import org.bukkit.block.Block;
-import org.bukkit.configuration.Configuration;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
-import java.util.HashSet;
-import java.util.List;
+import java.util.logging.Logger;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 public final class MovementService {
 
     private final double approachSpeed;
     private final double observeSpeed;
+    private final Logger log;
 
-    public MovementService(Configuration cfg) {
-        this.approachSpeed = cfg.getDouble("approachSpeed", 1.15);
-        this.observeSpeed = cfg.getDouble("observeSpeed", 0.80);
+    public MovementService(StalkerPlugin plugin) {
+        this.approachSpeed = plugin.getConfig().getDouble("approachSpeed", 1.15);
+        this.observeSpeed = plugin.getConfig().getDouble("observeSpeed", 0.80);
+        this.log = plugin.getLogger();
     }
 
     public void stop(Mob npc) {
@@ -36,27 +41,13 @@ public final class MovementService {
         lookAt(npc, target.getEyeLocation());
     }
 
-    public static void drawPath(Player viewer, List<Location> points) {
-        var world = viewer.getWorld();
-        for (Location p : points) {
-            world.spawnParticle(
-                    org.bukkit.Particle.DUST,
-                    p.clone().add(0, 0.2, 0),
-                    2,              // count
-                    0.02, 0.02, 0.02,// spread
-                    0,
-                    new org.bukkit.Particle.DustOptions(org.bukkit.Color.AQUA, 1.0f)
-            );
-        }
-    }
-
     public void moveTo(Mob npc, Location loc, boolean aggressive, Player player) {
         double speed = aggressive ? approachSpeed : observeSpeed;
         try {
             Pathfinder.PathResult path = npc.getPathfinder().findPath(loc);
             if (path != null) {
                 if (player != null) {
-                    drawPath(player, path.getPoints());
+                    VisualDebugService.drawPath(player, path.getPoints());
                 }
                 npc.getPathfinder().moveTo(path, speed);
             }
@@ -71,10 +62,38 @@ public final class MovementService {
         return adjustToGround(base);
     }
 
+    public Vector randomYawDeviation(Vector dir, double maxDegrees) {
+        Vector v = dir.clone();
+
+        // because it is 2D steering
+        v.setY(0);
+
+        if (v.lengthSquared() == 0) {
+            return new Vector(0, 0, 0);
+        }
+
+        v.normalize();
+
+        double angleDeg = ThreadLocalRandom.current().nextDouble(-maxDegrees, maxDegrees);
+        double angleRad = Math.toRadians(angleDeg);
+
+        double cos = Math.cos(angleRad);
+        double sin = Math.sin(angleRad);
+
+        double x = v.getX();
+        double z = v.getZ();
+
+        double newX = x * cos - z * sin;
+        double newZ = x * sin + z * cos;
+
+        return new Vector(newX, 0, newZ).normalize();
+    }
+
     public Location computeRetreatPoint(Mob npc, Player target, double away) {
         Vector awayVec = npc.getLocation().toVector().subtract(target.getLocation().toVector()).normalize().multiply(away);
-        Location base = npc.getLocation().clone().add(awayVec);
-        return adjustToGround(base);
+        Location loc = adjustToGround(npc.getLocation().clone().add(awayVec));
+
+        return loc;
     }
 
     public Location computeLoiterPoint(Mob npc, Player target, double radius) {
@@ -115,9 +134,10 @@ public final class MovementService {
         Location playerLoc = player.getLocation();
         double currentDistance = npcLoc.distance(playerLoc);
 
-
-        Block bestTree = findBestTreeForHiding(npcLoc, playerLoc, searchRadius, currentDistance);
+        Block bestTree = findPossibleTreeForHiding(npcLoc, playerLoc, searchRadius, currentDistance);
         if (bestTree == null) {
+            log.info("No tree found for current distance: " + currentDistance);
+            // we need to just run away in opposite direction
             return null;
         }
 
@@ -143,22 +163,19 @@ public final class MovementService {
      * @param currentDistance the current distance between NPC and player
      * @return the best tree block for hiding, or null if no suitable tree is found
      */
-    private Block findBestTreeForHiding(Location npcLoc, Location playerLoc, double searchRadius, double currentDistance) {
-        Block bestTree = null;
-        double bestScore = Double.MAX_VALUE;
-
-        // Minimum acceptable distance from player (70% of current distance, but at least 4 blocks)
-        double minAcceptableDistance = Math.max(4.0, currentDistance * 0.7);
-
+    private Block findPossibleTreeForHiding(Location npcLoc, Location playerLoc, double searchRadius, double currentDistance) {
         int radiusInt = (int) Math.ceil(searchRadius);
         int centerX = npcLoc.getBlockX();
         int centerY = npcLoc.getBlockY();
         int centerZ = npcLoc.getBlockZ();
+        long started = System.currentTimeMillis();
+        long blocksChecked = 0;
 
         for (int x = centerX - radiusInt; x <= centerX + radiusInt; x++) {
             for (int y = centerY - radiusInt; y <= centerY + radiusInt; y++) {
                 for (int z = centerZ - radiusInt; z <= centerZ + radiusInt; z++) {
                     Block block = npcLoc.getWorld().getBlockAt(x, y, z);
+                    blocksChecked += 1;
                     if (isTreeLog(block.getType())) {
                         // Compute the hiding position behind this tree
                         Vector playerLook = playerLoc.getDirection().normalize();
@@ -168,37 +185,38 @@ public final class MovementService {
                         // Calculate distance from hiding position to player
                         double distanceToPlayer = potentialHidePos.distance(playerLoc);
 
-                        // Skip trees that would bring us too close to the player
-                        if (distanceToPlayer < minAcceptableDistance) {
+                        // Skip trees that would bring us closer to the player
+                        if (distanceToPlayer < currentDistance) {
                             continue;
                         }
 
                         // Calculate distance from NPC to tree (for scoring)
-                        double distanceToTree = Math.sqrt(
-                                Math.pow(x - centerX, 2) +
-                                        Math.pow(y - centerY, 2) +
-                                        Math.pow(z - centerZ, 2)
-                        );
+                        double distanceToTree = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2) + Math.pow(z - centerZ, 2));
 
                         // Skip if outside search radius
                         if (distanceToTree > searchRadius) {
                             continue;
                         }
 
+                        // ms spent
+                        long msSpent = System.currentTimeMillis() - started;
+                        log.info("Found tree at (" + block.getX() + "," + block.getY() + "," + block.getZ() + ") distance to player: " + (int) distanceToPlayer + ", distance to NPC: " + (int) distanceToTree + ", blocks checked: " + blocksChecked + ", time spent: " + msSpent + "ms");
+                        return block;
+
                         // Score: prefer trees that are closer to NPC but maintain good distance from player
                         // Lower score is better
-                        double score = distanceToTree * 2.0 - (distanceToPlayer - minAcceptableDistance) * 0.5;
-
-                        if (score < bestScore) {
-                            bestScore = score;
-                            bestTree = block;
-                        }
+//                        double score = distanceToTree * 2.0 - (distanceToPlayer - minAcceptableDistance) * 0.5;
+//
+//                        if (score < bestScore) {
+//                            bestScore = score;
+//                            bestTree = block;
+//                        }
                     }
                 }
             }
         }
 
-        return bestTree;
+        return null;
     }
 
 
@@ -209,14 +227,6 @@ public final class MovementService {
      * @return true if the material is a log block
      */
     private boolean isTreeLog(Material material) {
-        return material == Material.OAK_LOG ||
-                material == Material.BIRCH_LOG ||
-                material == Material.SPRUCE_LOG ||
-                material == Material.JUNGLE_LOG ||
-                material == Material.ACACIA_LOG ||
-                material == Material.DARK_OAK_LOG ||
-                material == Material.MANGROVE_LOG ||
-                material == Material.CHERRY_LOG ||
-                material == Material.PALE_OAK_LOG;
+        return Tag.LOGS.isTagged(material);
     }
 }

@@ -5,6 +5,7 @@ import com.kupal.stalker.ai.nodes.StatefulActionNode;
 import com.kupal.stalker.ai.runtime.BtRuntime;
 import com.kupal.stalker.ai.services.NavigationService;
 import com.kupal.stalker.stalker.tree.StalkerBbKeys;
+import org.bukkit.Location;
 import org.bukkit.entity.Mob;
 import org.bukkit.plugin.Plugin;
 
@@ -92,5 +93,10 @@ public final class NpcBrain {
 
     public String currentBehavior() {
         return blackboard.get(StalkerBbKeys.DEBUG_STATE).orElse("IDLE");
+    }
+
+    public Location currentPosition() {
+        
+        return mob.getLocation();
     }
 }

@@ -1,9 +1,10 @@
 # ticks
-tickPeriod: 50
+tickPeriod: 1
 hideRecomputeCooldownTicks: 20
 approachTargetCooldownTicks: 20
 retreatRecomputeCooldownTicks: 10
 loiterRecomputeCooldownTicks: 50
+panicDurationTicks: 100
 
 # Radius within which the player can be targeted for pranks
 targetSearchRadius: 148.0

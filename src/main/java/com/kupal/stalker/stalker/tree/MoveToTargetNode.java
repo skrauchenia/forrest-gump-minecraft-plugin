@@ -2,14 +2,18 @@ package com.kupal.stalker.stalker.tree;
 
 import com.kupal.stalker.ai.*;
 import com.kupal.stalker.ai.nodes.StatefulActionNode;
+import com.kupal.stalker.util.ToString;
 import org.bukkit.Location;
 import org.bukkit.entity.Mob;
+
+import java.util.logging.Logger;
 
 public final class MoveToTargetNode extends StatefulActionNode {
 
     private final BlackboardKey<Location> targetKey;
     private final double stopDistance;
     private final double speed;
+    private final Logger log = Logger.getLogger("MoveToTargetNode");
 
     public MoveToTargetNode(BlackboardKey<Location> targetKey, double stopDistance, double speed) {
         this.targetKey = targetKey;
@@ -22,6 +26,7 @@ public final class MoveToTargetNode extends StatefulActionNode {
         Location target = bb.get(targetKey).orElse(null);
         if (target == null || target.getWorld() == null) {
             ctx.navigation().stop(npc);
+            log.info("Target location is null or has no world");
             return Status.FAILURE;
         }
 
@@ -32,11 +37,18 @@ public final class MoveToTargetNode extends StatefulActionNode {
 
         if (ctx.navigation().isAt(npc, target, stopDistance)) {
             ctx.navigation().stop(npc);
+            log.info("Reached target " + ToString.of(target));
             return Status.SUCCESS;
         }
 
-        ctx.navigation().moveTo(npc, target, speed);
-        return Status.RUNNING;
+        if (ctx.navigation().isNavigating(npc)) {
+            log.info("Already navigating to " + ToString.of(target));
+            return Status.RUNNING;
+        }
+
+        boolean started = ctx.navigation().moveTo(npc, target, speed, bb);
+        log.info("Moving to " + ToString.of(target));
+        return started ? Status.RUNNING : Status.FAILURE;
     }
 
     @Override
